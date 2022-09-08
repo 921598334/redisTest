@@ -1,7 +1,9 @@
 package gezhenqiMock;
 
 import com.alibaba.fastjson.JSON;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -10,15 +12,20 @@ import java.util.concurrent.TimeUnit;
 
 class AnalizeThread  implements  Runnable{
 
-    Jedis jedis = null;
+    JedisPool jedisPool = null;
     PointData pointData = null;
-
-    public AnalizeThread(Jedis jedis ,PointData pointData) {
-        this.jedis = jedis;
+    int count = 0;
+    public AnalizeThread(JedisPool jedisPool ,PointData pointData,int count) {
+        this.jedisPool = jedisPool;
         this.pointData = pointData;
+        this.count = count;
     }
 
     public void run() {
+
+        Jedis jedis = jedisPool.getResource();
+        jedis.auth("denghanbo");
+
 
         //分析。。。。
         //分析完成
@@ -31,8 +38,8 @@ class AnalizeThread  implements  Runnable{
 
         //一个下位机，一个通道一个zset,命名规范：pointDataAfterList_id_passId
         jedis.zadd("pointDataAfterList_"+pointDataAfter.getId()+"_"+pointData.getPassId()   ,pointDataAfter.getDate(), JSON.toJSONString(pointDataAfter));
-
-        System.out.println("插入成功");
+        jedis.close();
+        System.out.println(count+"插入成功");
     }
 }
 
@@ -41,32 +48,20 @@ class AnalizeThread  implements  Runnable{
 public class AnaliseService {
 
     //核心线程=下位机数量，最大线程=下位机数目*通道数
-    private ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(30, 100, 10, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(1));
-    private Jedis jedis = null;
+    private ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(300, 3000, 10, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(1));
+    private JedisPool jedisPool = null;
 
-    private static volatile AnaliseService analiseService = null;
 
-    public static AnaliseService getInstance(PointData pointData){
-
-        if(analiseService==null){
-            synchronized (AnaliseService.class){
-                if(analiseService==null){
-                    analiseService = new AnaliseService();
-                }
-            }
-        }
-        return analiseService;
-    }
 
     public AnaliseService() {
-        jedis = new Jedis("122.114.178.53", 6379);
-        jedis.auth("denghanbo");
+        GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
+        jedisPool = new JedisPool(poolConfig, "122.114.178.53", 6379,10000);
     }
 
     //进行分析
-    public void analise(PointData pointData){
+    public void analise(PointData pointData,int count){
 
-        threadPoolExecutor.execute(new AnalizeThread(jedis,pointData));
+        threadPoolExecutor.execute(new AnalizeThread(jedisPool,pointData,count));
 
     }
     

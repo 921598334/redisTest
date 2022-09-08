@@ -1,6 +1,9 @@
 package gezhenqiMock;
 
+import com.alibaba.fastjson.JSON;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 public class NettyClient {
 
@@ -11,10 +14,15 @@ public class NettyClient {
 
         AnaliseService analiseService = new AnaliseService();
 
+//        GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
+//        JedisPool jedisPool = new JedisPool(poolConfig, "122.114.178.53", 6379);
+
+
         //===========================Netty端============================
 
         //从下位机获取的某一条原始振动数据
 
+        int count = 0;
         //100条数据
         for(int i=0;i<100;i++){
 
@@ -38,11 +46,22 @@ public class NettyClient {
                     pointData.setY(yArray);
 
                     //调用远程服务进行分析与存储
-                    analiseService.analise(pointData);
+                    count++;
+                    analiseService.analise(pointData,count);
+
+
+//                    Jedis jedis = jedisPool.getResource();
+//                    jedis.auth("denghanbo");
+//                    jedis.zadd("pointDataAfterList_"+pointData.getId()+"_"+pointData.getPassId()   ,pointData.getDate(), JSON.toJSONString(pointData));
+//                    jedis.close();
+
+
+                    System.out.println(salveId+":"+passId+":完成");
                 }
             }
 
             Thread.sleep(1000);
+            System.out.println("完成一轮");
         }
 
 
